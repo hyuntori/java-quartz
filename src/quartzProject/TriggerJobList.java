@@ -2,6 +2,7 @@ package quartzProject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -19,22 +20,26 @@ import org.quartz.impl.matchers.GroupMatcher;
 
 public class TriggerJobList {
 
+	// 기본설정
+	static int sec = 5; // 반복 초: default 1초
+	
 	/**************
 	 * Validation *
 	 *************/
-	public static void Validation() {
-
+	public static void validation() {
+		
 		Process process = null;
 		ProcessBuilder processbid = null;
 		String whoami = ""; // 로그인 User Id
 		String authority = ""; // 권한
+		String tsharkProcNum = ""; // 프로세스 Id
 		ArrayList<String> command = new ArrayList<>(); // 명령어 ArrayList
 		command.add("whoami");
 		command.add("id");
 
 		for (int i = 0; i < command.size(); i++) {
 			String cmd = command.get(i); // 명령어
-			processbid = new ProcessBuilder("bash", "-c", cmd);
+			processbid = new ProcessBuilder("bash","-c",cmd);
 			processbid.redirectErrorStream(true);
 
 			try {	
@@ -48,7 +53,7 @@ public class TriggerJobList {
 						whoami = line;
 						command.set(1, "id "+whoami +"| awk '{print $1$2}' | sed 's/[^0-9]//g'");
 						System.out.println("로그인계정: " + whoami);
-					} else {
+					} else if(cmd.indexOf("id") != -1){
 						authority = line;
 						if (authority.equals("00")) {
 							System.out.println("root 계정으로 로그인하셨습니다. 작업을 시작합니다.");
@@ -70,11 +75,12 @@ public class TriggerJobList {
 		}
 
 	}
-
+	
+	
 	/*************
 	 * CronList 로직
 	 *************/
-	public static void CronList() {
+	public static void cronList() {
 		Scheduler schedulerList;
 		try {
 			schedulerList = new StdSchedulerFactory().getScheduler();
@@ -108,41 +114,20 @@ public class TriggerJobList {
 	 * @param args
 	 *****************/
 	public static void main(String args[]) {
-
-		// 기본설정
-		String status = "restart"; // 상태: default restart
-		int sec = 1; // 반복 초: default 1초
-		String pacapDir = "/home/hyunah/deepchannel/tshark"; // pcap 위치
-
 		// 루트 권한 체크
-		Validation();
-
-		/* 값 세팅 */
-		try {
-			status = args[0];
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		/* 명령어가 list인 경우 */
-		if (status.equals("list")) {
-			CronList();
-			System.exit(-1);
-		}
+		validation();
 
 		/* Job Apply */
 		JobDetail job = JobBuilder.newJob(ExecuteJob.class).withIdentity("delTshark", "daily").build();
 
 		/* Trigger List */
 		Trigger trigger = TriggerBuilder.newTrigger().withIdentity("t_delTshark", "daily")
-				.withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(1).repeatForever()).build();
+				.withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInSeconds(sec).repeatForever()).build();
 
 		/* scheduler */
 		Scheduler scheduler;
 		try {
 			scheduler = new StdSchedulerFactory().getScheduler();
-			// scheduler.getContext().put("name", "delTshark"); // [연습-param] execute 넘길
-			// Parameter.
 			scheduler.start();
 			scheduler.scheduleJob(job, trigger);
 
